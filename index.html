@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Jangchi Sariq - Kuchaytirilgan O‘yin</title>
+<style>
+  body, html {
+    margin: 0; padding: 0;
+    background: linear-gradient(to bottom, #2e8b57, #1c4d2f);
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    user-select: none;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  #gameArea {
+    position: relative;
+    width: 900px;
+    height: 400px;
+    margin: 40px 0 10px 0;
+    background: #111;
+    border: 4px solid #ffc107;
+    border-radius: 12px;
+    overflow: hidden;
+    filter: none;
+    transition: filter 0.1s ease;
+  }
+  .character {
+    position: absolute;
+    bottom: 20px;
+    width: 60px;
+    height: 90px;
+    border-radius: 12px;
+    box-shadow: 0 0 10px transparent;
+    transition: transform 0.1s ease, box-shadow 0.3s ease;
+  }
+  #player {
+    background: gold;
+    left: 100px;
+    box-shadow: 0 0 15px #ffde59;
+  }
+  #enemy {
+    background: crimson;
+    left: 700px;
+    box-shadow: 0 0 15px #ff4d4d;
+  }
+  /* Animatsiyalar */
+  .attacking {
+    animation: attackFlash 0.3s alternate 3;
+    transform: translateX(10px);
+  }
+  .blocking {
+    animation: blockFlash 0.3s alternate 3;
+    filter: brightness(0.7);
+  }
+  .special-attack {
+    animation: specialFlash 0.5s ease-in-out 3;
+    transform: scale(1.2);
+    box-shadow: 0 0 50px 15px gold;
+  }
+  /* Fire Wave */
+  .fire-wave {
+    animation: fireWaveAnim 0.7s ease-in-out 1;
+    box-shadow: 0 0 40px 15px #ff5722;
+    transform: scale(1.3);
+  }
+  @keyframes fireWaveAnim {
+    0%, 100% { box-shadow: 0 0 10px 5px #ff7043; }
+    50% { box-shadow: 0 0 60px 25px #ff3d00; }
+  }
+  /* Ice Strike */
+  .ice-strike {
+    animation: iceStrikeAnim 0.7s ease-in-out 1;
+    box-shadow: 0 0 50px 15px #00bcd4;
+    transform: scale(1.2);
+  }
+  @keyframes iceStrikeAnim {
+    0%, 100% { box-shadow: 0 0 10px 5px #4dd0e1; }
+    50% { box-shadow: 0 0 60px 25px #00acc1; }
+  }
+  @keyframes attackFlash {
+    0% {filter: brightness(1);}
+    50% {filter: brightness(1.8) saturate(1.3);}
+    100% {filter: brightness(1);}
+  }
+  @keyframes blockFlash {
+    0% {filter: brightness(1);}
+    50% {filter: brightness(0.6) saturate(0.8);}
+    100% {filter: brightness(1);}
+  }
+  @keyframes specialFlash {
+    0%,100% {box-shadow: 0 0 20px 5px gold;}
+    50% {box-shadow: 0 0 40px 15px gold;}
+  }
+  #ui {
+    width: 900px;
+    display: flex;
+    justify-content: space-between;
+    color: white;
+    font-weight: 600;
+    user-select: none;
+  }
+  .status {
+    background: rgba(0,0,0,0.4);
+    padding: 8px 12px;
+    border-radius: 8px;
+    width: 280px;
+    box-shadow: 0 0 8px rgba(255,255,255,0.15);
+  }
+  .status h2 {
+    margin: 0 0 6px 0;
+    font-size: 18px;
+  }
+  .bar {
+    position: relative;
+    height: 22px;
+    border-radius: 12px;
+    background: #555;
+    overflow: hidden;
+    margin-bottom: 8px;
+  }
+  .bar-inner {
+    position: absolute;
+    top: 0; left: 0; bottom: 0;
+    background: #ffca28;
+    width: 100%;
+    transition: width 0.3s ease, background-color 0.3s ease;
+  }
+  .bar-inner.energy {
+    background: #29b6f6;
+  }
+  .bar-inner.low {
+    animation: pulse 1s infinite alternate;
+  }
+  @keyframes pulse {
+    0% {opacity: 1;}
+    100% {opacity: 0.6;}
+  }
+  #comboCount {
+    font-size: 22px;
+    text-align: center;
+    margin-top: 12px;
+    color: #ffeb3b;
+    text-shadow: 0 0 6px #ffc107;
+  }
+  #instructions {
+    width: 900px;
+    margin: 20px auto;
+    color: #eee;
+    font-size: 16px;
+    text-align: center;
+    line-height: 1.5;
+  }
+  #gameOverPopup {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: white;
+    font-size: 24px;
+    font-weight: 700;
+    z-index: 9999;
+    flex-direction: column;
+    display: none;
+  }
+  #gameOverPopup button {
+    margin-top: 20px;
+    padding: 10px 20px;
+    font-size: 18px;
+    border: none;
+    border-radius: 8px;
+    background: #ffc107;
+    cursor: pointer;
+    color: #111;
+    font-weight: 700;
+  }
+  #gameOverPopup button:hover {
+    background: #ffca28;
+  }
+  #keyIndicators {
+    width: 900px;
+    margin: 10px auto 30px auto;
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+  }
+  .key {
+    background: #222;
+    border: 2px solid #555;
+    border-radius: 6px;
+    width: 50px;
+    height: 50px;
+    line-height: 50px;
+    text-align: center;
+    font-weight: 700;
+    color: #aaa;
+    user-select: none;
+    transition: all 0.2s ease;
+  }
+  .key.active {
+    border-color: #ffc107;
+    color: #fff;
+    background: #444;
+    box-shadow: 0 0 8px #ffc107;
+  }
+  #gameTime {
+    color: #ffc107;
+    font-weight: 700;
+    font-size: 20px;
+    text-align: center;
+    margin-bottom: 12px;
+    user-select: none;
+  }
+</style>
+</head>
+<body>
+
+<div id="gameArea">
+  <div id="player" class="character"></div>
+  <div id="enemy" class="character"></div>
+</div>
+
+<div id="gameTime">O‘yin vaqti: 0s</div>
+
+<div id="ui">
+  <div class="status" id="playerStatus">
+    <h2>Jangchi Sariq (Siz)</h2>
+    <div>Hayot:</div>
+    <div class="bar"><div class="bar-inner" id="playerHP"></div></div>
+    <div>Energiya:</div>
+    <div class="bar"><div class="bar-inner energy" id="playerEnergy"></div></div>
+    <div id="comboCount">Combo: 0</div>
+    <div style="margin-top: 6px; font-size: 14px;">
+      Level: <span id="playerLevel">1</span> | XP: <span id="playerXP">0</span> / <span id="playerXPToNext">100</span>
+    </div>
+  </div>
+  <div class="status" id="enemyStatus">
+    <h2>Dushman</h2>
+    <div>Hayot:</div>
+    <div class="bar"><div class="bar-inner" id="enemyHP"></div></div>
+    <div>Energiya:</div>
+    <div class="bar"><div class="bar-inner energy" id="enemyEnergy"></div></div>
+  </div>
+</div>
+
+<div id="instructions">
+  <b>Harakatlar:</b> ◀️ Chap, ▶️ O'ng | Z — Hujum | X — Maxsus zarba 1 | C — Maxsus zarba 2 | Shift — Blok<br />
+  Maqsad: Dushmanni yengish va hayotingizni saqlash!
+</div>
+
+<div id="keyIndicators">
+  <div class="key" id="keyArrowLeft">◀️</div>
+  <div class="key" id="keyArrowRight">▶️</div>
+  <div class="key" id="keyZ">Z</div>
+  <div class="key" id="keyX">X</div>
+  <div class="key" id="keyC">C</div>
+  <div class="key" id="keyShift">Shift</div>
+</div>
+
+<div id="gameOverPopup">
+  <div id="gameOverMessage"></div>
+  <button id="restartBtn">Qayta boshlash</button>
+</div>
+
+<script>
+(() => {
+  // --- O‘yin doimiylari ---
+  const GAME_WIDTH = 900;
+  const PLAYER_WIDTH = 60;
+  const ENEMY_WIDTH = 60;
+
+  const MAX_HP = 100;
+  const MAX_ENERGY = 100;
+  const ENERGY_REGEN_RATE = 0.7;
+
+  const PLAYER_SPEED = 6;
+  const ENEMY_SPEED = 3;
+
+  const ATTACK_DAMAGE_BASE = 15;
+  const SPECIAL_DAMAGE_BASE = 40;
+  const BLOCK_REDUCTION = 0.7;
+  const COMBO_TIME_LIMIT = 1200;
+
+  const MAX_LEVEL = 10;
+  const XP_PER_LEVEL = 100;
+
+  // --- DOM elementlar ---
+  const player = document.getElementById("player");
+  const enemy = document.getElementById("enemy");
+
+  const playerHPBar = document.getElementById("playerHP");
+  const playerEnergyBar = document.getElementById("playerEnergy");
+  const enemyHPBar = document.getElementById("enemyHP");
+  const enemyEnergyBar = document.getElementById("enemyEnergy");
+
+  const comboCountText = document.getElementById("comboCount");
+
+  const gameOverPopup = document.getElementById("gameOverPopup");
+  const gameOverMessage = document.getElementById("gameOverMessage");
+  const restartBtn = document.getElementById("restartBtn");
+
+  const gameArea = document.getElementById("gameArea");
+  const gameTimeText = document.getElementById("gameTime");
+
+  // Klaviatura indikatorlari
+  const keyArrowLeft = document.getElementById("keyArrowLeft");
+  const keyArrowRight = document.getElementById("keyArrowRight");
+  const keyZ = document.getElementById("keyZ");
+  const keyX = document.getElementById("keyX");
+  const keyC = document.getElementById("keyC");
+  const keyShift = document.getElementById("keyShift");
+
+  const playerLevelText = document.getElementById("playerLevel");
+  const playerXPText = document.getElementById("playerXP");
+  const playerXPToNextText = document.getElementById("playerXPToNext");
+
+  // Ovoz effektlari to‘plami - bir nechta variantlar tasodifiy tanlanadi
+  const sounds = {
+    attack: [
+      new Audio("https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg"),
+      new Audio("https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg"),
+      new Audio("https://actions.google.com/sounds/v1/cartoon/wood_thud_soft.ogg")
+    ],
+    special: [
+      new Audio("https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg"),
+      new Audio("https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg")
+    ],
+    block: [
+      new Audio("https://actions.google.com/sounds/v1/cartoon/wood_thud_soft.ogg"),
+      new Audio("https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg")
+    ],
+    gameover: new Audio("https://actions.google.com/sounds/v1/cartoon/boing.ogg"),
+    victory: new Audio("https://actions.google.com/sounds/v1/cartoon/concussive_hit_guitar_boing.ogg"),
+    fireWave: new Audio("https://actions.google.com/sounds/v1/fire/fire_burn.ogg"),
+    iceStrike: new Audio("https://actions.google.com/sounds/v1/ambiences/ice_cracking.ogg"),
+  };
+
+  // --- O‘yin holati ---
+  const state = {
+    player: {
+      x: 100,
+      hp: MAX_HP,
+      energy: MAX_ENERGY,
+      comboCount: 0,
+      lastAttackTime: 0,
+      isBlocking: false,
+      isAttacking: false,
+      hitsLanded: 0,
+      level: 1,
+      xp: 0,
+      xpToNextLevel: XP_PER_LEVEL,
+    },
+    enemy: {
+      x: 700,
+      hp: MAX_HP,
+      energy: MAX_ENERGY,
+      isBlocking: false,
+      isAttacking: false,
+      lastAttackTime: 0,
+      comboCount: 0,
+      hitsLanded: 0,
+    },
+    keysPressed: {},
+    gameOver: false,
+    gameStartTime: Date.now(),
+  };
+
+  // Maxsus zarbalar ro'yxati
+  const specialMoves = [
+    {
+      name: "Oltin Zarba",
+      damage: 40,
+      energyCost: 50,
+      animationClass: "special-attack",
+      sound: sounds.special[0],
+    },
+    {
+      name: "Yong'in To‘lqini",
+      damage: 60,
+      energyCost: 70,
+      animationClass: "fire-wave",
+      sound: sounds.fireWave,
+    },
+    {
+      name: "Muz Zarbasi",
+      damage: 50,
+      energyCost: 60,
+      animationClass: "ice-strike",
+      sound: sounds.iceStrike,
+    }
+  ];
+
+  // --- Helper: Ovozlarni tasodifiy ijro etish ---
+  function playRandomSound(soundArray) {
+    const sound = soundArray[Math.floor(Math.random() * soundArray.length)];
+    sound.currentTime = 0;
+    sound.play();
+  }
+
+  // --- Hayot barlarini yangilash ---
+  function updateHPBars() {
+    playerHPBar.style.width = state.player.hp + "%";
+    enemyHPBar.style.width = state.enemy.hp + "%";
+
+    // Ranglar
+    if(state.player.hp > 60) {
+      playerHPBar.style.backgroundColor = "#4caf50";
+      playerHPBar.classList.remove("low");
+    } else if(state.player.hp > 30) {
+      playerHPBar.style.backgroundColor = "#ffeb3b";
+      playerHPBar.classList.remove("low");
+    } else {
+      playerHPBar.style.backgroundColor = "#f44336";
+      playerHPBar.classList.add("low");
+    }
+
+    if(state.enemy.hp > 60) {
+      enemyHPBar.style.backgroundColor = "#4caf50";
+      enemyHPBar.classList.remove("low");
+    } else if(state.enemy.hp > 30) {
+      enemyHPBar.style.backgroundColor = "#ffeb3b";
+      enemyHPBar.classList.remove("low");
+    } else {
+      enemyHPBar.style.backgroundColor = "#f44336";
+      enemyHPBar.classList.add("low");
+    }
+  }
+
+  // --- Energiya barlarini yangilash ---
+  function updateEnergyBars() {
+    playerEnergyBar.style.width = state.player.energy + "%";
+    enemyEnergyBar.style.width = state.enemy.energy + "%";
+
+    if(state.player.energy > 50) {
+      playerEnergyBar.style.backgroundColor = "#29b6f6";
+      playerEnergyBar.classList.remove("low");
+    } else {
+      playerEnergyBar.style.backgroundColor = "#0288d1";
+      playerEnergyBar.classList.add("low");
+    }
+
+    if(state.enemy.energy > 50) {
+      enemyEnergyBar.style.backgroundColor = "#29b6f6";
+      enemyEnergyBar.classList.remove("low");
+    } else {
+      enemyEnergyBar.style.backgroundColor = "#0288d1";
+      enemyEnergyBar.classList.add("low");
+    }
+  }
+
+  // --- Combo matnini yangilash ---
+  function updateComboText() {
+    comboCountText.textContent = `Combo: ${state.player.comboCount}`;
+  }
+
+  // --- Player daraja va XP ni yangilash ---
+  function updateLevelXPText() {
+    playerLevelText.textContent = state.player.level;
+    playerXPText.textContent = state.player.xp;
+    playerXPToNextText.textContent = state.player.xpToNextLevel;
+  }
+
+  // --- Joylashuvlarni yangilash ---
+  function updatePositions() {
+    player.style.left = state.player.x + "px";
+    enemy.style.left = state.enemy.x + "px";
+  }
+
+  // --- Zarba kuchini hisoblash ---
+  function getDamage(base, comboMultiplier) {
+    return Math.floor(base + comboMultiplier * 2);
+  }
+
+  // --- Ekranni silkitleish ---
+  function shakeScreen(intensity) {
+    const original = gameArea.style.transform;
+    gameArea.style.transform = `translate(${intensity}px, 0)`;
+    setTimeout(() => { gameArea.style.transform = original; }, 50);
+  }
+
+  // --- O‘yinchi oddiy hujumi ---
+  function playerAttack() {
+    if (state.player.isAttacking || state.gameOver) return;
+    if (state.player.energy < 10) return;
+
+    state.player.isAttacking = true;
+    state.player.energy -= 10;
+
+    playRandomSound(sounds.attack);
+    player.classList.add("attacking");
+
+    if (Math.abs(state.player.x - state.enemy.x) < PLAYER_WIDTH) {
+      let damage = getDamage(ATTACK_DAMAGE_BASE, state.player.comboCount);
+      if (state.enemy.isBlocking) {
+        damage *= (1 - BLOCK_REDUCTION);
+        playRandomSound(sounds.block);
+      }
+      state.enemy.hp -= damage;
+      state.player.hitsLanded++;
+      addCombo();
+      gainXP(10);
+      shakeScreen(4);
+    } else {
+      resetCombo();
+    }
+
+    checkGameOver();
+    updateHPBars();
+    updateEnergyBars();
+
+    setTimeout(() => {
+      player.classList.remove("attacking");
+      state.player.isAttacking = false;
+    }, 350);
+  }
+
+  // --- Maxsus zarba ishlatish ---
+  function useSpecialMove(index) {
+    if (state.player.isAttacking || state.gameOver) return;
+    const move = specialMoves[index];
+    if (state.player.energy < move.energyCost) return;
+
+    state.player.isAttacking = true;
+    state.player.energy -= move.energyCost;
+
+    player.classList.add(move.animationClass);
+    move.sound.currentTime = 0;
+    move.sound.play();
+
+    if (Math.abs(state.player.x - state.enemy.x) < PLAYER_WIDTH + 20) {
+      let damage = getDamage(move.damage, state.player.comboCount + 1);
+      if (state.enemy.isBlocking) {
+        damage *= (1 - BLOCK_REDUCTION);
+        playRandomSound(sounds.block);
+      }
+      state.enemy.hp -= damage;
+      state.player.hitsLanded++;
+      addCombo(true);
+      gainXP(20);
+      shakeScreen(8);
+    } else {
+      resetCombo();
+    }
+
+    checkGameOver();
+    updateHPBars();
+    updateEnergyBars();
+
+    setTimeout(() => {
+      player.classList.remove(move.animationClass);
+      state.player.isAttacking = false;
+    }, 650);
+  }
+
+  // --- O‘yinchi blok holati ---
+  function playerBlock(on) {
+    if(state.gameOver) return;
+    state.player.isBlocking = on;
+    if (on) {
+      player.classList.add("blocking");
+      playRandomSound(sounds.block);
+    } else {
+      player.classList.remove("blocking");
+    }
+  }
+
+  // --- O‘yinchi combo qo‘shish ---
+  let comboTimeout = null;
+  function addCombo(special = false) {
+    const now = Date.now();
+    if (now - state.player.lastAttackTime < COMBO_TIME_LIMIT) {
+      state.player.comboCount++;
+      if (special) state.player.comboCount++;
+    } else {
+      state.player.comboCount = 1;
+    }
+    if (state.player.comboCount > 15) state.player.comboCount = 15;
+    state.player.lastAttackTime = now;
+
+    clearTimeout(comboTimeout);
+    comboTimeout = setTimeout(() => resetCombo(), 1800);
+
+    updateComboText();
+  }
+
+  // --- O‘yinchi combo reset ---
+  function resetCombo() {
+    state.player.comboCount = 0;
+    updateComboText();
+  }
+
+  // --- Dushman AI harakatlari ---
+  function enemyAI() {
+    if(state.gameOver || state.enemy.isAttacking) return;
+
+    let dist = state.player.x - state.enemy.x;
+    const absDist = Math.abs(dist);
+
+    if (state.enemy.isBlocking) {
+      if (Math.random() < 0.04) enemyBlock(false);
+      return;
+    }
+
+    if(absDist > PLAYER_WIDTH + 30) {
+      // Ya’ni masofa katta, yaqinlashish
+      if(dist > 0) {
+        state.enemy.x = Math.min(state.enemy.x + ENEMY_SPEED * 1.3, GAME_WIDTH - ENEMY_WIDTH - 10);
+      } else {
+        state.enemy.x = Math.max(state.enemy.x - ENEMY_SPEED * 1.3, 10);
+      }
+    } else {
+      if(state.enemy.energy >= 50 && Math.random() < 0.35) {
+        enemySpecial();
+      } else if (state.enemy.comboCount >= 3 && !state.enemy.isBlocking && Math.random() < 0.5) {
+        enemyAttack();
+      } else if(Math.random() < 0.45) {
+        enemyBlock(true);
+      } else {
+        enemyAttack();
+      }
+    }
+  }
+
+  // --- Dushman oddiy hujumi ---
+  function enemyAttack() {
+    if (state.enemy.isAttacking || state.gameOver) return;
+    if (state.enemy.energy < 10) return;
+
+    state.enemy.isAttacking = true;
+    state.enemy.energy -= 10;
+    playRandomSound(sounds.attack);
+
+    enemy.classList.add("attacking");
+
+    if (Math.abs(state.enemy.x - state.player.x) < ENEMY_WIDTH) {
+      let damage = getDamage(ATTACK_DAMAGE_BASE, state.enemy.comboCount);
+      if (state.player.isBlocking) {
+        damage *= (1 - BLOCK_REDUCTION);
+        playRandomSound(sounds.block);
+      }
+      state.player.hp -= damage;
+      state.enemy.hitsLanded++;
+      enemyAddCombo();
+      shakeScreen(4);
+    } else {
+      enemyResetCombo();
+    }
+
+    checkGameOver();
+    updateHPBars();
+    updateEnergyBars();
+
+    setTimeout(() => {
+      enemy.classList.remove("attacking");
+      state.enemy.isAttacking = false;
+    }, 350);
+  }
+
+  // --- Dushman maxsus zarbasi ---
+  function enemySpecial() {
+    if (state.enemy.isAttacking || state.gameOver) return;
+    if (state.enemy.energy < 50) return;
+
+    state.enemy.isAttacking = true;
+    state.enemy.energy -= 50;
+    playRandomSound(sounds.special[0]);
+
+    enemy.classList.add("special-attack");
+
+    if (Math.abs(state.enemy.x - state.player.x) < ENEMY_WIDTH + 20) {
+      let damage = getDamage(SPECIAL_DAMAGE_BASE, state.enemy.comboCount + 1);
+      if (state.player.isBlocking) {
+        damage *= (1 - BLOCK_REDUCTION);
+        playRandomSound(sounds.block);
+      }
+      state.player.hp -= damage;
+      state.enemy.hitsLanded++;
+      enemyAddCombo(true);
+      shakeScreen(8);
+    } else {
+      enemyResetCombo();
+    }
+
+    checkGameOver();
+    updateHPBars();
+    updateEnergyBars();
+
+    setTimeout(() => {
+      enemy.classList.remove("special-attack");
+      state.enemy.isAttacking = false;
+    }, 650);
+  }
+
+  // --- Dushman blok holati ---
+  function enemyBlock(on) {
+    if(state.gameOver) return;
+    state.enemy.isBlocking = on;
+    if (on) {
+      enemy.classList.add("blocking");
+      playRandomSound(sounds.block);
+    } else {
+      enemy.classList.remove("blocking");
+    }
+  }
+
+  // --- Dushman combo qo‘shish ---
+  let enemyComboTimeout = null;
+  function enemyAddCombo(special = false) {
+    const now = Date.now();
+    if (now - state.enemy.lastAttackTime < COMBO_TIME_LIMIT) {
+      state.enemy.comboCount++;
+      if (special) state.enemy.comboCount++;
+    } else {
+      state.enemy.comboCount = 1;
+    }
+    if (state.enemy.comboCount > 15) state.enemy.comboCount = 15;
+    state.enemy.lastAttackTime = now;
+
+    clearTimeout(enemyComboTimeout);
+    enemyComboTimeout = setTimeout(() => enemyResetCombo(), 1800);
+  }
+
+  // --- Dushman combo reset ---
+  function enemyResetCombo() {
+    state.enemy.comboCount = 0;
+  }
+
+  // --- O‘yin tugaganini tekshirish ---
+  function checkGameOver() {
+    if(state.player.hp <= 0) {
+      state.player.hp = 0;
+      state.gameOver = true;
+      showGameOver(false);
+    } else if(state.enemy.hp <= 0) {
+      state.enemy.hp = 0;
+      state.gameOver = true;
+      showGameOver(true);
+    }
+  }
+
+  // --- O‘yin tugadi pop-upini ko‘rsatish ---
+  function showGameOver(playerWon) {
+    gameOverPopup.style.display = "flex";
+    gameOverMessage.textContent = playerWon ? "Siz g‘alaba qildingiz! 🎉" : "Afsus, yutqazdingiz! 😢";
+
+    if(playerWon) {
+      sounds.victory.currentTime = 0;
+      sounds.victory.play();
+    } else {
+      sounds.gameover.currentTime = 0;
+      sounds.gameover.play();
+    }
+    gameArea.style.filter = "blur(2px)";
+  }
+
+  // --- O‘yinni qayta boshlash ---
+  function restartGame() {
+    state.player.hp = MAX_HP + (state.player.level - 1) * 20;
+    state.player.energy = MAX_ENERGY + (state.player.level - 1) * 10;
+    state.player.x = 100;
+    state.player.comboCount = 0;
+    state.player.isBlocking = false;
+    state.player.isAttacking = false;
+    state.player.hitsLanded = 0;
+
+    state.enemy.hp = MAX_HP;
+    state.enemy.energy = MAX_ENERGY;
+    state.enemy.x = 700;
+    state.enemy.isBlocking = false;
+    state.enemy.isAttacking = false;
+    state.enemy.comboCount = 0;
+    state.enemy.hitsLanded = 0;
+
+    state.gameOver = false;
+    state.gameStartTime = Date.now();
+
+    resetCombo();
+    enemyResetCombo();
+    updatePositions();
+    updateHPBars();
+    updateEnergyBars();
+    updateComboText();
+    updateLevelXPText();
+
+    gameOverPopup.style.display = "none";
+    gameArea.style.filter = "none";
+  }
+
+  // --- XP olish va Level up ---
+  function gainXP(amount) {
+    if (state.gameOver) return;
+
+    state.player.xp += amount;
+    while (state.player.xp >= state.player.xpToNextLevel && state.player.level < MAX_LEVEL) {
+      state.player.xp -= state.player.xpToNextLevel;
+      levelUp();
+    }
+    updateLevelXPText();
+  }
+
+  function levelUp() {
+    state.player.level++;
+    state.player.xpToNextLevel = XP_PER_LEVEL + (state.player.level - 1) * 50;
+    // HP va energiyani yangilash
+    state.player.hp = Math.min(MAX_HP + state.player.level * 20, 200);
+    state.player.energy = MAX_ENERGY + state.player.level * 10;
+    updateHPBars();
+    updateEnergyBars();
+    alert(`Tabriklaymiz! Siz ${state.player.level}-levelga ko‘tarildingiz!`);
+  }
+
+  // --- Energiya tiklanishi ---
+  function regenEnergy() {
+    if(state.player.energy < MAX_ENERGY) {
+      state.player.energy = Math.min(MAX_ENERGY, state.player.energy + ENERGY_REGEN_RATE);
+    }
+    if(state.enemy.energy < MAX_ENERGY) {
+      state.enemy.energy = Math.min(MAX_ENERGY, state.enemy.energy + ENERGY_REGEN_RATE * 0.8);
+    }
+  }
+
+  // --- Klaviatura bosilishi ---
+  function handleKeyDown(e) {
+    if(state.gameOver) return;
+
+    const k = e.key.toLowerCase();
+
+    if (k === "arrowleft") keyArrowLeft.classList.add("active");
+    if (k === "arrowright") keyArrowRight.classList.add("active");
+    if (k === "z") keyZ.classList.add("active");
+    if (k === "x") keyX.classList.add("active");
+    if (k === "c") keyC.classList.add("active");
+    if (k === "shift") keyShift.classList.add("active");
+
+    if(state.keysPressed[k]) return;
+    state.keysPressed[k] = true;
+
+    if(k === "arrowleft") {
+      state.player.x = Math.max(10, state.player.x - PLAYER_SPEED);
+      updatePositions();
+    }
+    if(k === "arrowright") {
+      state.player.x = Math.min(GAME_WIDTH - PLAYER_WIDTH - 10, state.player.x + PLAYER_SPEED);
+      updatePositions();
+    }
+    if(k === "shift") {
+      playerBlock(true);
+    }
+    if(k === "z") {
+      playerAttack();
+    }
+    if(k === "x") {
+      useSpecialMove(0); // Oltin Zarba
+    }
+    if(k === "c") {
+      useSpecialMove(1); // Yong'in To‘lqini
+    }
+  }
+
+  // --- Klaviatura qo‘yilishi ---
+  function handleKeyUp(e) {
+    const k = e.key.toLowerCase();
+
+    if (k === "arrowleft") keyArrowLeft.classList.remove("active");
+    if (k === "arrowright") keyArrowRight.classList.remove("active");
+    if (k === "z") keyZ.classList.remove("active");
+    if (k === "x") keyX.classList.remove("active");
+    if (k === "c") keyC.classList.remove("active");
+    if (k === "shift") keyShift.classList.remove("active");
+
+    if(k === "shift") {
+      playerBlock(false);
+    }
+    state.keysPressed[k] = false;
+  }
+
+  // --- O‘yin sikli ---
+  function gameLoop() {
+    if(!state.gameOver) {
+      regenEnergy();
+      enemyAI();
+      updateEnergyBars();
+
+      // O‘yin vaqti
+      const seconds = Math.floor((Date.now() - state.gameStartTime) / 1000);
+      gameTimeText.textContent = `O‘yin vaqti: ${seconds}s`;
+    }
+    updateHPBars();
+    updatePositions();
+
+    requestAnimationFrame(gameLoop);
+  }
+
+  // --- Boshlang‘ich sozlash ---
+  function init() {
+    updatePositions();
+    updateHPBars();
+    updateEnergyBars();
+    updateComboText();
+    updateLevelXPText();
+
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+    restartBtn.addEventListener("click", restartGame);
+
+    restartGame();
+    gameLoop();
+  }
+
+  init();
+
+})();
+</script>
+
+</body>
+</html>
